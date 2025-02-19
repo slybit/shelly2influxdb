@@ -1,7 +1,7 @@
 # One of 'error', 'warn', 'info', 'verbose', debug', 'silly'
 loglevel: 'verbose'
 ESlogging:
-    enabled: true
+    enabled: false
     label: SHELLY2INFLUXDB
     loglevel: info
     options:
@@ -20,16 +20,18 @@ interval: 900
 
 # Shelly power measurement units
 shellypm:
-  - measurement: shellypm_energy
-    url: http://192.168.1.60/rpc/Shelly.GetStatus
-    tags:
-      label: shellypmminig3-airco-bureau
-    fields:
-      value: $.pm1:0.aenergy.total
+  - url: http://192.168.1.60/rpc/Shelly.GetStatus
+    measurements:
+      - measurement: shellypm_energy
+        tags:
+          label: shellypmminig3-airco-bureau
+        fields:
+          value: $.pm1:0.aenergy.total
 
-  - measurement: shellypm_energy
-    url: http://192.168.1.61/rpc/Shelly.GetStatus
-    tags:
-      label: shellypmminig3-airco-bureau
-    fields:
-      value: $.pm1:0.aenergy.total
+  - url: http://192.168.1.61/rpc/Shelly.GetStatus
+    measurements:
+      - measurement: shellypm_energy
+        tags:
+          label: shellypmminig3-airco-pc
+        fields:
+          value: $.pm1:0.aenergy.total

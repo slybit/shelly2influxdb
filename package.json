@@ -4,7 +4,7 @@
   "description": "Small service that publishes Shelly energy measurements to influxdb",
   "main": "shelly2influxdb.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node shelly2influxdb.js"
   },
   "repository": {
     "type": "git",
