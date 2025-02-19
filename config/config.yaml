@@ -1,0 +1,35 @@
+# One of 'error', 'warn', 'info', 'verbose', debug', 'silly'
+loglevel: 'verbose'
+ESlogging:
+    enabled: true
+    label: SHELLY2INFLUXDB
+    loglevel: info
+    options:
+        indexPrefix: logs
+        clientOpts:
+            node: http://es.elastic.home
+
+# Configuration passed to the node-influx library
+influx:
+  database: 'shellypm'
+  host: 'influxdb.k3s.home'
+  port: 80
+
+# Polling interval (seconds)
+interval: 900
+
+# Shelly power measurement units
+shellypm:
+  - measurement: shellypm_energy
+    url: http://192.168.1.60/rpc/Shelly.GetStatus
+    tags:
+      label: shellypmminig3-airco-bureau
+    fields:
+      value: $.pm1:0.aenergy.total
+
+  - measurement: shellypm_energy
+    url: http://192.168.1.61/rpc/Shelly.GetStatus
+    tags:
+      label: shellypmminig3-airco-bureau
+    fields:
+      value: $.pm1:0.aenergy.total
