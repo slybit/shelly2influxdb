@@ -1,5 +1,5 @@
 # One of 'error', 'warn', 'info', 'verbose', debug', 'silly'
-loglevel: 'verbose'
+loglevel: 'debug'
 ESlogging:
     enabled: false
     label: SHELLY2INFLUXDB
@@ -15,8 +15,15 @@ influx:
   host: 'influxdb.k3s.home'
   port: 80
 
+databases:
+  - name: 'shellypm'
+    retentionPolicies:
+    - name: 14d
+      duration: 14d
+
+
 # Polling interval (seconds)
-interval: 900
+interval: 9
 
 # Shelly power measurement units
 shellypm:

@@ -8,25 +8,25 @@ const { logger } = require('./standardlogger.js');
 const { mergeConfig } = require('axios');
 const config = require('./config.js').parse();
 
-// create influxDB connector
-const influx = new Influx.InfluxDB(config.influx);
+
+
+const bucket = {};
 
 
 
+const pushToBucket = function (point, database = undefined, retentionPolicy = 'autogen') {
 
+    const db = database ? database : config.influx.database;
+    logger.debug('Add to bucket', {'database': db, 'measurement': point.measurement, 'fields': point.fields, 'tags': point.tags, 'timestamp': point.timestamp, 'retention': retentionPolicy});
 
-const writeToInfux = (point, retentionPolicy = 'autogen') => {
-
-    logger.verbose('Publishing to influx', { 'measurement': point.measurement, 'fields': point.fields, 'tags': point.tags, 'timestamp': point.timestamp, 'Retention': retentionPolicy });
-    influx.writePoints([
-        point
-    ], {
-        retentionPolicy: retentionPolicy,
-    }).catch(err => {
-        logger.warn(`Error saving data to InfluxDB! ${err.stack}`)
-    }
-    )
+    if (!bucket.hasOwnProperty(db)) bucket[db] = {};
+    if (!bucket[db].hasOwnProperty(retentionPolicy)) bucket[db][retentionPolicy] = [];
+    
+    bucket[db][retentionPolicy].push(point);
 }
+
+
+
 
 /*
  * Pull data from the Shelly PM modules
@@ -52,7 +52,8 @@ const pullShellyPMData = async () => {
                     }
 
                     if (point.measurement && Object.keys(point.fields).length > 0) {
-                        writeToInfux(point);
+                        point.timestamp = new Date();
+                        pushToBucket(point, m.database, m.retentionPolicy);
                     } else {
                         if (!point.measurement)
                             logger.warn('No measurement provided. Nothing sent to influx DB.');
@@ -76,19 +77,79 @@ const parseJSONPath = (path, json) => {
     return v.length > 0 ? v[0] : undefined;
 }
 
-
-
-/**
- * Now, we'll make sure the database exists and boot the app.
- */
-let repeater;
-influx.getDatabaseNames()
-    .then(names => {
-        if (!names.includes(config.influx.database)) {
-            return influx.createDatabase(config.influx.database);
+const createDatabases = async (names) => {
+    // name contains the already existing databases
+    for (let dbItem of config.databases) {
+        if (!names.includes(dbItem.name)) {
+            await influx.createDatabase(dbItem.name);            
+            logger.info(`Create influx database ${dbItem.name}`);
         }
-    })
-    .then(() => {
+        await createRetentionPolicies(dbItem);
+    }
+    
+
+}
+
+
+const createRetentionPolicies = async (dbItem) => {
+    let policies = await influx.showRetentionPolicies(dbItem.name);   
+      
+    for (let p of policies) {
+        for (let rp of dbItem.retentionPolicies) {
+            if (p.name === rp.name) rp.exists = true;
+        }
+    }
+    for (let rp of dbItem.retentionPolicies) {
+        if (!rp.exists) {
+            await influx.createRetentionPolicy(rp.name, {
+                database: dbItem.name,
+                duration: rp.duration,
+                replication: rp.replication ? rp.replication : 1
+            });
+            logger.info(`Create influx retention policy ${rp.name} for database ${dbItem.name}`);
+        }
+    }
+}
+
+
+// setup the repeater to write the bucket to influxdb
+const writeRepeater = setInterval(async function () {
+    
+    // go over the entries in the bucket
+    let i = 0;
+    for (const db in bucket) {
+        for (const retentionPolicy in bucket[db]) {
+            const points = bucket[db][retentionPolicy];
+            if (points.length > 0) {
+                setTimeout(async () => {
+                    try {
+                        await influx.writePoints(points, {
+                            database: db,
+                            retentionPolicy: retentionPolicy
+                        });
+                        logger.debug(`Wrote ${points.length} points to database ${db} with retention policy ${retentionPolicy}`);
+                    } catch (err) {
+                        logger.warn(`Error saving data to database ${db} with retention policy ${retentionPolicy}! ${err.stack}`);
+                    }
+                    // clear the bucket for this retention policy
+                    bucket[db][retentionPolicy] = [];
+                }, i++ * 200);
+            }
+        }
+    }
+}, 60*1000);
+
+
+
+
+// Create our influx instance
+const influx = new Influx.InfluxDB(config.influx);
+
+const go = async () => {
+    try {
+        // Now, we'll make sure the databases exist
+        let names = await influx.getDatabaseNames();
+        await createDatabases(names);
         logger.info('Influx DB ready to use.');
         // pull the data
         pullShellyPMData();
@@ -96,14 +157,11 @@ influx.getDatabaseNames()
         repeater = setInterval(function () {
             pullShellyPMData();
         }, config.interval ? config.interval * 1000 : 60 * 1000);
-    })
-    .catch(err => {
-        logger.error('Error connecting to the Influx database!');
-        logger.error(err);
-        if (repeater) clearInterval(repeater);
+    } catch (err) {
+            logger.error(`Error connecting to the Influx database! ${err.stack}`);
+            if (repeater) clearInterval(repeater);
     }
-    )
+}
 
 
-
-
+go();
