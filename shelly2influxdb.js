@@ -1,12 +1,3 @@
-// insert shellypm_energy,label=server,ref=1 value=8519 1750842056000000000
-
-// insert shellypm_energy,label=server value=9519 1750888256000000000  25/06 23u50
-// insert shellypm_energy,label=server value=9519 1750891856000000000  25/06 00u50
-// insert shellypm_energy,label=server value=11572 1750974656000000000 26/06 23u50
-
-
-
-
 const Influx = require('influx');
 const axios = require('axios').default;
 const { JSONPath } = require('jsonpath-plus');
@@ -44,8 +35,6 @@ const pushToBucket = function (point, database = undefined, retentionPolicy = 'a
  */
 const pullShellyPMData = async () => {
     for (let shelly of config.shellypm) {
-        let attempt = 1;
-        while (attempt <= 5) {
             try {
                 const response = await axios.get(shelly.url);                
                 // energy measurement
@@ -67,6 +56,7 @@ const pullShellyPMData = async () => {
 
                 // other measurements
                 for (let m of shelly.measurements) {
+                    console.log("MEASUREMENT");
                     let point = {};
                     point.measurement = m.measurement;
                     point.tags = {};
@@ -90,9 +80,9 @@ const pullShellyPMData = async () => {
                         if (Object.keys(point.fields).length == 0)
                             logger.warn('Empty fields array. Nothing sent to influx DB.');
                     }
-                    // set attempt to 5 to immediately escape the while loop
-                    attempt = 6; 
                 }
+                   
+                
             } catch (e) {
                 console.log(e);
                 logger.error('Error getting data from shelly', { 'url' : shelly.url, 'attempt' : attempt});
@@ -100,7 +90,7 @@ const pullShellyPMData = async () => {
             }
         }
 
-    }
+    
 }
 
 const parseJSONPath = (path, json) => {
@@ -173,7 +163,7 @@ const fixEnergyValue = async (point) => {
             fields: {'value' : lastEnergyPoints[point.tags.label].value},
             timestamp: lastEnergyPoints[point.tags.label].timestamp
         };
-        pushToEnergyBucket(newRef);                    
+        pushToBucket(point, config.energy.database ? config.energy.database : config.influx.database, config.energy.retentionPolicy ? config.energy.retentionPolicy : 'autogen');                    
         logger.warn(`Created new REF value ${lastEnergyPoints[point.tags.label].value} to influxdb for label ${point.tags.label}`); 
         // update the refEnergyPoints map to point to the last value and timestamp
         refEnergyPoints[point.tags.label] = {
@@ -215,7 +205,7 @@ const writePoints = async (points, db, retentionPolicy, energy = false) => {
 
 
 // setup the repeater to write the bucket to influxdb
-const writeRepeater = setInterval(async function () {
+const writeBucketToInflux = async () => {
    
     // go over the entries in the 'other' bucket
     for (const db in bucket) {
@@ -227,7 +217,8 @@ const writeRepeater = setInterval(async function () {
             }
         }
     }
-}, 10*1000);
+
+}
 
 
 
@@ -247,10 +238,12 @@ const go = async () => {
         lastEnergyPoints = await getLastEnergyPoints();
         refEnergyPoints = await getLastEnergyPoints("ref='1'");
         // pull the data
-        pullShellyPMData();
+        await pullShellyPMData();
+        await writeBucketToInflux();
         // start up the repeater
-        repeater = setInterval(function () {
-            pullShellyPMData();
+        repeater = setInterval(async function () {
+            await pullShellyPMData();
+            await writeBucketToInflux();
         }, config.interval ? config.interval * 1000 : 60 * 1000);
     } catch (err) {
             logger.error(`Error connecting to the Influx database! ${err.stack}`);

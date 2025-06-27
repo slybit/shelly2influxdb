@@ -37,12 +37,7 @@ shellypm:
         label: airco-bureau
         value: pm1:0.aenergy.total
         force_increasing: true
-    measurements:
-      - measurement: shellypm_other
-        tags:
-          label: airco-bureau
-        fields:
-          value: $.pm1:0.aenergy.total
+    measurements: []
 
   - url: http://192.168.1.61/rpc/Shelly.GetStatus
     energy:
