@@ -12,8 +12,8 @@ ESlogging:
 # Configuration passed to the node-influx library
 influx:
   database: 'shellypm'
-  host: 'influxdb.k3s.home'
-  port: 80
+  host: 'localhost'
+  port: 8086
 
 databases:
   - name: 'shellypm'
@@ -23,22 +23,34 @@ databases:
 
 
 # Polling interval (seconds)
-interval: 9
+interval: 5
+
+energy:
+  database: 'shellypm'
+  measurement: shellypm_energy
+
 
 # Shelly power measurement units
 shellypm:
   - url: http://192.168.1.60/rpc/Shelly.GetStatus
+    energy:
+        label: airco-bureau
+        value: pm1:0.aenergy.total
+        force_increasing: true
     measurements:
-      - measurement: shellypm_energy
+      - measurement: shellypm_other
         tags:
-          label: shellypmminig3-airco-bureau
+          label: airco-bureau
         fields:
           value: $.pm1:0.aenergy.total
 
   - url: http://192.168.1.61/rpc/Shelly.GetStatus
+    energy:
+        label: pc
+        value: pm1:0.aenergy.total
     measurements:
-      - measurement: shellypm_energy
+      - measurement: shellypm_other
         tags:
-          label: shellypmminig3-airco-pc
+          label: pc
         fields:
           value: $.pm1:0.aenergy.total
