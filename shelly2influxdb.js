@@ -47,20 +47,7 @@ const pullShellyPMData = async () => {
         let attempt = 1;
         while (attempt <= 5) {
             try {
-                //const response = await axios.get(shelly.url);
-                response = {
-                    data: { 
-                        'pm1:0': {
-                            id: 0,
-                            voltage: 233.1,
-                            current: 0.166,
-                            apower: 7.8,
-                            freq: 50,
-                            aenergy: { total: 0.442, by_minute: [Array], minute_ts: 1750981044 },
-                            ret_aenergy: { total: 0, by_minute: [Array], minute_ts: 1750981044 }
-                        },
-                    }
-                };
+                const response = await axios.get(shelly.url);                
                 // energy measurement
                 let point = {};
                 point.measurement = config.energy ? (config.energy.measurement ? config.energy.measurement : 'shelly_energy') : 'shelly_energy';
